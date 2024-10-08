@@ -7,6 +7,7 @@
 #include <omp.h>
 #include <tsl/robin_map.h>
 #include <tsl/robin_set.h>
+#include "mkl.h"
 
 #include <bitset>
 #include <boost/dynamic_bitset.hpp>
@@ -15,6 +16,7 @@
 #include <random>
 #include <atomic>
 #include <utility>
+#include <queue>
 
 #include "efanna2e/exceptions.h"
 #include "efanna2e/parameters.h"
@@ -24,6 +26,7 @@
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
 #define PROJECTION_SLACK 2
+#define PARTSIZE 20000000
 
 namespace efanna2e {
 
@@ -41,7 +44,8 @@ IndexBipartite::~IndexBipartite() {}
 
 void IndexBipartite::BuildBipartite(size_t n_sq, const float *sq_data, size_t n_bp, const float *bp_data,
                                     const Parameters &parameters) {
-   std::cout << "start build bipartite index" << std::endl;
+    // RM_COUT
+    // std::cout << "start build bipartite index" << std::endl;
     auto s = std::chrono::high_resolution_clock::now();
     uint32_t M_sq = parameters.Get<uint32_t>("M_sq");
     uint32_t M_bp = parameters.Get<uint32_t>("M_bp");
@@ -95,12 +99,14 @@ void IndexBipartite::BuildBipartite(size_t n_sq, const float *sq_data, size_t n_
     // std::cout << "begin link projection" << std::endl;
 
     qbaseNNbipartite(parameters);
-    std::cout << std::endl;
+    // RM_COUT
+    // std::cout << std::endl;
 
     // e = std::chrono::high_resolution_clock::now();
-    auto e = std::chrono::high_resolution_clock::now();
-    auto diff = e - s;
-    std::cout << "Build projection graph time: " << diff.count() / (1000 * 1000 * 1000) << std::endl;
+    // RM_COUT
+    // auto e = std::chrono::high_resolution_clock::now();
+    // auto diff = e - s;
+    // std::cout << "Build projection graph time: " << diff.count() / (1000 * 1000 * 1000) << std::endl;
 
     for (i = 0; i < projection_graph_.size(); ++i) {
         std::vector<uint32_t> &nbrs = projection_graph_[i];
@@ -108,10 +114,11 @@ void IndexBipartite::BuildBipartite(size_t n_sq, const float *sq_data, size_t n_
         projection_degree_max = std::max(projection_degree_max, nbrs.size());
         projection_degree_min = std::min(projection_degree_min, nbrs.size());
     }
-    std::cout << "total degree: " << projection_degree_avg << std::endl;
-    std::cout << "Projection degree avg: " << projection_degree_avg / (float)u32_nd_ << std::endl;
-    std::cout << "Projection degree max: " << projection_degree_max << std::endl;
-    std::cout << "Projection degree min: " << projection_degree_min << std::endl;
+    // RM_COUT
+    // std::cout << "total degree: " << projection_degree_avg << std::endl;
+    // std::cout << "Projection degree avg: " << projection_degree_avg / (float)u32_nd_ << std::endl;
+    // std::cout << "Projection degree max: " << projection_degree_max << std::endl;
+    // std::cout << "Projection degree min: " << projection_degree_min << std::endl;
 
     // statistics of bipartite_graph_
     float max_degree_nd = 0, min_degree_nd = std::numeric_limits<float>::max(), avg_degree_nd = 0;
@@ -142,7 +149,8 @@ void IndexBipartite::BuildBipartite(size_t n_sq, const float *sq_data, size_t n_
 
 void IndexBipartite::BuildRoarGraph(size_t n_sq, const float *sq_data, size_t n_bp, const float *bp_data,
                                     const Parameters &parameters) {
-    std::cout << "start build bipartite index" << std::endl;
+    // RM_COUT
+    // std::cout << "start build bipartite index" << std::endl;
     auto s = std::chrono::high_resolution_clock::now();
     uint32_t M_sq = parameters.Get<uint32_t>("M_sq");
     // uint32_t M_bp = parameters.Get<uint32_t>("M_bp");
@@ -203,9 +211,10 @@ void IndexBipartite::BuildRoarGraph(size_t n_sq, const float *sq_data, size_t n_
     CalculateProjectionep();
 
     assert(projection_ep_ < nd_);
-    std::cout << "begin link projection" << std::endl;
+    // RM_COUT
+    // std::cout << "begin link projection" << std::endl;
     LinkProjection(parameters);
-    std::cout << std::endl;
+    // std::cout << std::endl;
     // std::cout << "Starting collect points" << std::endl;
     // auto co_s = std::chrono::high_resolution_clock::now();
     // CollectPoints(parameters);
@@ -214,9 +223,11 @@ void IndexBipartite::BuildRoarGraph(size_t n_sq, const float *sq_data, size_t n_
     // std::cout << "Collect points time: " << diff.count() << std::endl;
 
     // e = std::chrono::high_resolution_clock::now();
-    auto e = std::chrono::high_resolution_clock::now();
-    auto diff = e - s;
-    std::cout << "Build projection graph time: " << diff.count() / (1000 * 1000 * 1000) << std::endl;
+
+    // RM_COUT
+    // auto e = std::chrono::high_resolution_clock::now();
+    // auto diff = e - s;
+    // std::cout << "Build projection graph time: " << diff.count() / (1000 * 1000 * 1000) << std::endl;
 
     for (i = 0; i < projection_graph_.size(); ++i) {
         std::vector<uint32_t> &nbrs = projection_graph_[i];
@@ -224,10 +235,11 @@ void IndexBipartite::BuildRoarGraph(size_t n_sq, const float *sq_data, size_t n_
         projection_degree_max = std::max(projection_degree_max, nbrs.size());
         projection_degree_min = std::min(projection_degree_min, nbrs.size());
     }
-    std::cout << "total degree: " << projection_degree_avg << std::endl;
-    std::cout << "Projection degree avg: " << projection_degree_avg / (float)u32_nd_ << std::endl;
-    std::cout << "Projection degree max: " << projection_degree_max << std::endl;
-    std::cout << "Projection degree min: " << projection_degree_min << std::endl;
+    // RM_COUT
+    // std::cout << "total degree: " << projection_degree_avg << std::endl;
+    // std::cout << "Projection degree avg: " << projection_degree_avg / (float)u32_nd_ << std::endl;
+    // std::cout << "Projection degree max: " << projection_degree_max << std::endl;
+    // std::cout << "Projection degree min: " << projection_degree_min << std::endl;
 
     has_built = true;
 }
@@ -502,7 +514,8 @@ void IndexBipartite::LinkBipartite(const Parameters &parameters, SimpleNeighbor 
 
     // std::cout << "after link one node, max degree" << max_degree << std::endl;
 
-    std::cout << std::endl;
+    // RM_COUT
+    // std::cout << std::endl;
 #pragma omp parallel for schedule(dynamic, 100)
     for (uint32_t i = 0; i < u32_total_pts_; ++i) {
         boost::dynamic_bitset<> visited(u32_total_pts_);
@@ -949,7 +962,8 @@ void IndexBipartite::PruneLocalJoinCandidates(uint32_t node, const Parameters &p
 }
 
 void IndexBipartite::BipartiteProjectionReserveSpace(const Parameters &parameters) {
-    std::cout << "begin projection graph init" << std::endl;
+    // RM_COUT
+    // std::cout << "begin projection graph init" << std::endl;
     uint32_t M_pjbp = parameters.Get<uint32_t>("M_pjbp");
     projection_graph_.resize(u32_nd_);
     for (uint32_t i = 0; i < u32_nd_; ++i) {
@@ -999,13 +1013,14 @@ void IndexBipartite::TrainingLink2Projection(const Parameters &parameters, Simpl
             projection_graph_[cur_tgt] = pruned_list;
         }
         ProjectionAddReverse(cur_tgt, parameters);
-        if (sq % 1000 == 0) {
-            std::cout << "\r" << (100.0 * sq) / u32_nd_sq_ << "% of projection search bipartite by base completed."
-                      << std::flush;
-        }
+        // RM_COUT
+        // if (sq % 1000 == 0) {
+        //     std::cout << "\r" << (100.0 * sq) / u32_nd_sq_ << "% of projection search bipartite by base completed."
+        //               << std::flush;
+        // }
     }
-
-    std::cout << std::endl;
+    // RM_COUT
+    // std::cout << std::endl;
     std::atomic<uint32_t> degree_cnt(0);
     std::atomic<uint32_t> zero_cnt(0);
 #pragma omp parallel for schedule(static, 100)
@@ -1090,13 +1105,14 @@ void IndexBipartite::LinkProjection(const Parameters &parameters) {
             projection_graph_[cur_tgt] = pruned_list;
         }
         ProjectionAddReverse(cur_tgt, parameters);
-        if (sq % 1000 == 0) {
-            std::cout << "\r" << (100.0 * sq) / u32_nd_sq_ << "% of projection search bipartite by base completed."
-                      << std::flush;
-        }
+        // RM_COUT
+        // if (sq % 1000 == 0) {
+        //     std::cout << "\r" << (100.0 * sq) / u32_nd_sq_ << "% of projection search bipartite by base completed."
+        //               << std::flush;
+        // }
     }
-
-    std::cout << std::endl;
+    // RM_COUT
+    // std::cout << std::endl;
 #pragma omp parallel for schedule(static, 100)
     for (uint32_t i = 0; i < vis_order.size(); ++i) {
         uint32_t node = vis_order[i];
@@ -1153,7 +1169,8 @@ void IndexBipartite::LinkProjection(const Parameters &parameters) {
             }
         }
     }
-    std::cout << "Projection time: " << projection_time << std::endl;
+    // RM_COUT
+    // std::cout << "Projection time: " << projection_time << std::endl;
     std::cout << "Warning: " << degree_cnt.load() << " nodes have less than M_pjbp neighbors." << std::endl;
     std::cout << "Warning: " << zero_cnt.load() << " nodes have no neighbors." << std::endl;
 
@@ -1172,13 +1189,14 @@ void IndexBipartite::LinkProjection(const Parameters &parameters) {
         avg_degree += static_cast<float>(projection_graph_[i].size());
         total_degree += projection_graph_[i].size();
     }
-    std::cout << "total degree: " << total_degree << std::endl;
+    // RM_COUT
+    // std::cout << "total degree: " << total_degree << std::endl;
     avg_degree /= (float)u32_nd_;
-    std::cout << "After projection, average degree of projection graph: " << avg_degree << std::endl;
-    std::cout << "After projection, max degree of projection graph: " << max_degree << std::endl;
-    std::cout << "After projection, min degree of projection graph: " << min_degree << std::endl;
-
-    std::cout << std::endl;
+    // RM_COUT
+    // std::cout << "After projection, average degree of projection graph: " << avg_degree << std::endl;
+    // std::cout << "After projection, max degree of projection graph: " << max_degree << std::endl;
+    // std::cout << "After projection, min degree of projection graph: " << min_degree << std::endl;
+    // std::cout << std::endl;
 
     for (size_t i = 0; i < projection_graph_.size(); ++i) {
         // projection_graph_[i].clear();
@@ -1213,13 +1231,13 @@ void IndexBipartite::LinkProjection(const Parameters &parameters) {
             supply_nbrs_[node] = pruned_list;
         }
         SupplyAddReverse(node, parameters);
-        if (node % 1000 == 0) {
-            std::cout << "\r" << (100.0 * node) / (u32_nd_) << "% of projection graph base search completed."
-                      << std::flush;
-        }
+        // if (node % 1000 == 0) {
+        //     std::cout << "\r" << (100.0 * node) / (u32_nd_) << "% of projection graph base search completed."
+        //               << std::flush;
+        // }
     }
 
-    std::cout << "finish connectivity enhancement" << std::endl;
+    // std::cout << "finish connectivity enhancement" << std::endl;
 
 #pragma omp parallel for schedule(dynamic, 2048)
     for (uint32_t i = 0; i < nd_; ++i) {
@@ -1246,7 +1264,8 @@ void IndexBipartite::LinkProjection(const Parameters &parameters) {
             }
         }
     }
-    std::cout << "finish connectivity enhancement degree check" << std::endl;
+    // RM_COUT
+    // std::cout << "finish connectivity enhancement degree check" << std::endl;
 
 #pragma omp parallel for schedule(dynamic, 100)
     for (size_t i = 0; i < projection_graph_.size(); ++i) {
@@ -1268,12 +1287,15 @@ void IndexBipartite::LinkProjection(const Parameters &parameters) {
         // std::copy(ok_insert.begin(), ok_insert.end(), projection_graph_[i].begin());
     }
 
-    t2 = std::chrono::high_resolution_clock::now();
+    // RM_COUT
+    // t2 = std::chrono::high_resolution_clock::now();
 
     // save t2 - t1 in seconds in connectivity enhancement time
-    auto connectivity_enhancement_time = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
+    // RM_COUT
+    // auto connectivity_enhancement_time = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
 
-    std::cout << "Connectivity enhancement time: " << connectivity_enhancement_time << std::endl;
+    // RM_COUT
+    // std::cout << "Connectivity enhancement time: " << connectivity_enhancement_time << std::endl;
 }
 
 void IndexBipartite::SearchProjectionGraphInternal(NeighborPriorityQueue &search_queue, const float *query,
@@ -2035,7 +2057,8 @@ void IndexBipartite::CalculateProjectionep() {
     }
     projection_ep_ = closest;
     // projection_ep_ = min_idx;
-    std::cout << "projection ep: " << projection_ep_ << std::endl;
+    // RM_COUT
+    // std::cout << "projection ep: " << projection_ep_ << std::endl;
     delete[] center;
     delete[] distances;
 }
@@ -2335,7 +2358,6 @@ std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraph(const float *query
     vl_type visited_array_tag = vl->curV;
 
     for (auto &id : init_ids) {
-
         // dist_cmp_metric.reset();
         float distance = distance_->compare(data_bp_ + id * dimension_, query, (unsigned)dimension_);
         // if (metric_ == efanna2e::Metric::INNER_PRODUCT) {
@@ -2418,6 +2440,127 @@ std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraph(const float *query
     }
     return std::make_pair(cmps, hops);
 }
+
+std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraphIPDiff(const float *query, float exp_ratio, size_t &qid, const Parameters &parameters,
+                                               std::vector<unsigned>& res_indices, std::vector<float>& res_dists) {
+    const float ip_diff = -sqrt(dimension_) * log(exp_ratio);
+    NeighborDiffPriorityQueue search_queue(ip_diff);
+    // search_queue.reserve(L_pq);
+    // std::random_device rd;
+    // std::mt19937 gen(rd());
+    // std::uniform_int_distribution<uint32_t> dis(0, u32_nd_ - 1);
+    // uint32_t start = dis(gen);  // start is base
+    // uint32_t start = projection_ep_;
+    // projection_ep_ = start;
+    std::vector<uint32_t> init_ids;
+    init_ids.push_back(projection_ep_);
+    prefetch_vector((char *)(data_bp_ + projection_ep_ * dimension_), dimension_);
+    // init_ids.push_back(projection_ep_);
+    // _mm_prefetch((char *)data_bp_ + projection_ep_ * dimension_, _MM_HINT_T0);
+    // init_ids.push_back(dis(gen));
+    // block_metric.reset();
+    // boost::dynamic_bitset<> visited{u32_nd_, 0};
+    // tsl::robin_set<uint32_t> visited(5000);
+    // std::bitset<bsize> visited;
+    // block_metric.record();
+    VisitedList *vl = visited_list_pool_->getFreeVisitedList();
+    vl_type *visited_array = vl->mass;
+    vl_type visited_array_tag = vl->curV;
+
+    for (auto &id : init_ids) {
+        // dist_cmp_metric.reset();
+        float distance = distance_->compare(data_bp_ + id * dimension_, query, (unsigned)dimension_);
+        // if (metric_ == efanna2e::Metric::INNER_PRODUCT) {
+        //     distance = -distance;
+        // }
+        // dist_cmp_metric.record();
+
+        // memory_access_metric.reset();
+        Neighbor nn = Neighbor(id, distance, false);
+        search_queue.insert(nn);
+        // visited_array[id] = visited_array_tag;
+        // visited.set(id);
+        // visited.insert(id);
+        // memory_access_metric.record();
+    }
+    uint32_t cmps = 0;
+    uint32_t hops = 0;
+    uint32_t cnt_update = 0;
+    while (search_queue.has_unexpanded_node()) {
+        // memory_access_metric.reset();
+        auto cur_check_node = search_queue.closest_unexpanded();
+        auto cur_id = cur_check_node.id;
+        // visited.set(cur_id);
+        uint32_t *cur_nbrs = projection_graph_[cur_id].data();
+        // memory_access_metric.record();
+        // _mm_prefetch((char *)(visited_array + *(cur_nbrs + 1)), _MM_HINT_T0);
+        // _mm_prefetch((char *)(data_bp_ + *(cur_nbrs) * dimension_), _MM_HINT_T0);
+
+        ++hops;
+        // get neighbors' neighbors, first
+        for (size_t j = 0; j < projection_graph_[cur_id].size(); ++j) {  // current check node's neighbors
+            uint32_t nbr = *(cur_nbrs + j);
+            // memory_access_metric.reset();
+            // if (visited.find(nbr) != visited.end()) {
+            // _mm_prefetch((char *)(visited_array + *(cur_nbrs + j)), _MM_HINT_T0);
+            // if (j + 1 <= projection_graph_[cur_id].size()) {
+            _mm_prefetch((char *)(visited_array + *(cur_nbrs + j + 1)), _MM_HINT_T0);
+            _mm_prefetch((char *)(data_bp_ + *(cur_nbrs + j + 1) * dimension_), _MM_HINT_T0);
+            // }
+            // _mm_prefetch((char *)(data_bp_ + *(cur_nbrs + j) * dimension_), _MM_HINT_T0);
+            if (visited_array[nbr] != visited_array_tag) {
+                // if (visited.test(nbr)) {
+                //     continue;
+                // }
+                // prefetch_vector((char *)(data_bp_ + nbr * dimension_), dimension_);
+                // visited.insert(nbr);
+                // visited.set(nbr);
+                visited_array[nbr] = visited_array_tag;
+                // memory_access_metric.record();
+                float distance = distance_->compare(data_bp_ + nbr * dimension_, query, (unsigned)dimension_);
+                // _mm_prefetch((char *) data_bp_ + )
+                // dist_cmp_metric.reset();
+                // if (likely(metric_ == efanna2e::INNER_PRODUCT)) {
+                //     distance = -distance;
+                // }
+
+                // dist_cmp_metric.record();
+                // memory_access_metric.reset();
+
+                ++cmps;
+                int update_pos = search_queue.insert({nbr, distance, false});
+                // if(search_queue.insert({nbr, distance, false})) {
+                //     _mm_prefetch((char *)projection_graph_[nbr].data(), _MM_HINT_T2);
+                // }
+                // memory_access_metric.record();
+                if (update_pos >= search_queue.size() * 0.1) {
+                    cnt_update++;
+                } else {
+                    cnt_update = 0;
+                }
+                // std::cout << "cur_dist=" << distance << ", head_dist=" << search_queue.head_dist() 
+                //     << ", threshold=" << ip_diff << ", update_pos=" << update_pos
+                //     << ", cnt_update=" << cnt_update << ", pool.size_=" << search_queue.size()
+                //     << std::endl;
+                if (search_queue.tail_dist() - search_queue.head_dist() >= ip_diff && cnt_update > 20) {
+                    break;
+                }
+            }
+        }
+    }
+    visited_list_pool_->releaseVisitedList(vl);
+
+    unsigned k = search_queue.size();
+    res_indices.resize(k);
+    res_dists.resize(k);
+    for (size_t i = 0; i < k; ++i) {
+        // indices[qid * k + i] = search_queue[i].id;
+        res_indices[i] = search_queue[i].id;
+        res_dists[i] = search_queue[i].distance;
+    }
+    return std::make_pair(cmps, hops);
+}
+
 
 // uint32_t IndexBipartite::SearchProjectionGraph(const float *query, size_t k, size_t &qid, const Parameters
 // &parameters,
@@ -2640,6 +2783,287 @@ void IndexBipartite::LoadLearnBaseKNN(const char *filename) {
     }
     in.close();
 }
+
+// ======= Copied and reorganized from DiskANN compute_groundtruth.cpp start ======
+typedef uint64_t _u64;
+typedef int64_t  _s64;
+typedef uint32_t _u32;
+typedef int32_t  _s32;
+typedef uint16_t _u16;
+typedef int16_t  _s16;
+typedef uint8_t  _u8;
+typedef int8_t   _s8;
+
+using pairIF = std::pair<int, float>;
+struct cmpmaxstruct {
+  bool operator()(const pairIF &l, const pairIF &r) {
+    return l.second < r.second;
+  };
+};
+
+using maxPQIFCS =
+    std::priority_queue<pairIF, std::vector<pairIF>, cmpmaxstruct>;
+
+template<class T>
+T div_round_up(const T numerator, const T denominator) {
+  return (numerator % denominator == 0) ? (numerator / denominator)
+                                        : 1 + (numerator / denominator);
+}
+
+void compute_l2sq(float *const points_l2sq, const float *const matrix,
+                  const int64_t num_points, const int dim) {
+  assert(points_l2sq != NULL);
+#pragma omp parallel for schedule(static, 65536)
+  for (int64_t d = 0; d < num_points; ++d)
+    points_l2sq[d] = cblas_sdot(dim, matrix + (ptrdiff_t) d * (ptrdiff_t) dim,
+                                1, matrix + (ptrdiff_t) d * (ptrdiff_t) dim, 1);
+}
+
+void distsq_to_points(
+    const size_t dim,
+    float       *dist_matrix,  // Col Major, cols are queries, rows are points
+    size_t npoints, const float *const points,
+    const float *const points_l2sq,  // points in Col major
+    size_t nqueries, const float *const queries,
+    const float *const queries_l2sq,  // queries in Col major
+    float *ones_vec = NULL)  // Scratchspace of num_data size and init to 1.0
+{
+  bool ones_vec_alloc = false;
+  if (ones_vec == NULL) {
+    ones_vec = new float[nqueries > npoints ? nqueries : npoints];
+    std::fill_n(ones_vec, nqueries > npoints ? nqueries : npoints, (float) 1.0);
+    ones_vec_alloc = true;
+  }
+  cblas_sgemm(CblasColMajor, CblasTrans, CblasNoTrans, npoints, nqueries, dim,
+              (float) -2.0, points, dim, queries, dim, (float) 0.0, dist_matrix,
+              npoints);
+  cblas_sgemm(CblasColMajor, CblasNoTrans, CblasTrans, npoints, nqueries, 1,
+              (float) 1.0, points_l2sq, npoints, ones_vec, nqueries,
+              (float) 1.0, dist_matrix, npoints);
+  cblas_sgemm(CblasColMajor, CblasNoTrans, CblasTrans, npoints, nqueries, 1,
+              (float) 1.0, ones_vec, npoints, queries_l2sq, nqueries,
+              (float) 1.0, dist_matrix, npoints);
+  if (ones_vec_alloc)
+    delete[] ones_vec;
+}
+
+void inner_prod_to_points(
+    const size_t dim,
+    float       *dist_matrix,  // Col Major, cols are queries, rows are points
+    size_t npoints, const float *const points, size_t nqueries,
+    const float *const queries,
+    float *ones_vec = NULL)  // Scratchspace of num_data size and init to 1.0
+{
+  bool ones_vec_alloc = false;
+  if (ones_vec == NULL) {
+    ones_vec = new float[nqueries > npoints ? nqueries : npoints];
+    std::fill_n(ones_vec, nqueries > npoints ? nqueries : npoints, (float) 1.0);
+    ones_vec_alloc = true;
+  }
+  cblas_sgemm(CblasColMajor, CblasTrans, CblasNoTrans, npoints, nqueries, dim,
+              (float) -1.0, points, dim, queries, dim, (float) 0.0, dist_matrix,
+              npoints);
+
+  if (ones_vec_alloc)
+    delete[] ones_vec;
+}
+
+void exact_knn(
+    const size_t dim, const size_t k,
+    int *const closest_points,         // k * num_queries preallocated, col
+                                       // major, queries columns
+    float *const dist_closest_points,  // k * num_queries
+                                       // preallocated, Dist to
+                                       // corresponding closes_points
+    size_t npoints,
+    float *points_in,  // points in Col major
+    size_t nqueries, float *queries_in,
+    efanna2e::Metric metric = efanna2e::Metric::L2)  // queries in Col major
+{
+  float *points_l2sq = new float[npoints];
+  float *queries_l2sq = new float[nqueries];
+  compute_l2sq(points_l2sq, points_in, npoints, dim);
+  compute_l2sq(queries_l2sq, queries_in, nqueries, dim);
+
+  float *points = points_in;
+  float *queries = queries_in;
+
+  if (metric == efanna2e::Metric::COSINE) {  // we convert cosine distance as
+                                            // normalized L2 distnace
+    points = new float[npoints * dim];
+    queries = new float[nqueries * dim];
+#pragma omp parallel for schedule(static, 4096)
+    for (_s64 i = 0; i < (_s64) npoints; i++) {
+      float norm = std::sqrt(points_l2sq[i]);
+      if (norm == 0) {
+        norm = std::numeric_limits<float>::epsilon();
+      }
+      for (_u32 j = 0; j < dim; j++) {
+        points[i * dim + j] = points_in[i * dim + j] / norm;
+      }
+    }
+
+#pragma omp parallel for schedule(static, 4096)
+    for (_s64 i = 0; i < (_s64) nqueries; i++) {
+      float norm = std::sqrt(queries_l2sq[i]);
+      if (norm == 0) {
+        norm = std::numeric_limits<float>::epsilon();
+      }
+      for (_u32 j = 0; j < dim; j++) {
+        queries[i * dim + j] = queries_in[i * dim + j] / norm;
+      }
+    }
+    // recalculate norms after normalizing, they should all be one.
+    compute_l2sq(points_l2sq, points, npoints, dim);
+    compute_l2sq(queries_l2sq, queries, nqueries, dim);
+  }
+
+// RM_COUT
+//   std::cout << "Going to compute " << k << " NNs for " << nqueries
+//             << " queries over " << npoints << " points in " << dim
+//             << " dimensions using";
+//   if (metric == efanna2e::Metric::INNER_PRODUCT)
+//     std::cout << " MIPS ";
+//   else if (metric == efanna2e::Metric::COSINE)
+//     std::cout << " Cosine ";
+//   else
+//     std::cout << " L2 ";
+//   std::cout << "distance fn. " << std::endl;
+
+  size_t q_batch_size = (1 << 10);
+  float *dist_matrix = new float[(size_t) q_batch_size * (size_t) npoints];
+
+  for (_u64 b = 0; b < div_round_up(nqueries, q_batch_size); ++b) {
+    int64_t q_b = b * q_batch_size;
+    int64_t q_e =
+        ((b + 1) * q_batch_size > nqueries) ? nqueries : (b + 1) * q_batch_size;
+
+    if (metric == efanna2e::Metric::L2 || metric == efanna2e::Metric::COSINE) {
+      distsq_to_points(dim, dist_matrix, npoints, points, points_l2sq,
+                       q_e - q_b, queries + (ptrdiff_t) q_b * (ptrdiff_t) dim,
+                       queries_l2sq + q_b);
+    } else {
+      inner_prod_to_points(dim, dist_matrix, npoints, points, q_e - q_b,
+                           queries + (ptrdiff_t) q_b * (ptrdiff_t) dim);
+    }
+    // RM_COUT
+    // std::cout << "Computed distances for queries: [" << q_b << "," << q_e << ")"
+    //           << std::endl;
+
+#pragma omp parallel for schedule(dynamic, 16)
+    for (long long q = q_b; q < q_e; q++) {
+      maxPQIFCS point_dist;
+      for (_u64 p = 0; p < k; p++)
+        point_dist.emplace(
+            p, dist_matrix[(ptrdiff_t) p +
+                           (ptrdiff_t) (q - q_b) * (ptrdiff_t) npoints]);
+      for (_u64 p = k; p < npoints; p++) {
+        if (point_dist.top().second >
+            dist_matrix[(ptrdiff_t) p +
+                        (ptrdiff_t) (q - q_b) * (ptrdiff_t) npoints])
+          point_dist.emplace(
+              p, dist_matrix[(ptrdiff_t) p +
+                             (ptrdiff_t) (q - q_b) * (ptrdiff_t) npoints]);
+        if (point_dist.size() > k)
+          point_dist.pop();
+      }
+      for (ptrdiff_t l = 0; l < (ptrdiff_t) k; ++l) {
+        closest_points[(ptrdiff_t) (k - 1 - l) +
+                       (ptrdiff_t) q * (ptrdiff_t) k] = point_dist.top().first;
+        dist_closest_points[(ptrdiff_t) (k - 1 - l) +
+                            (ptrdiff_t) q * (ptrdiff_t) k] =
+            point_dist.top().second;
+        point_dist.pop();
+      }
+      assert(std::is_sorted(
+          dist_closest_points + (ptrdiff_t) q * (ptrdiff_t) k,
+          dist_closest_points + (ptrdiff_t) (q + 1) * (ptrdiff_t) k));
+    }
+    // RM_COUT
+    // std::cout << "Computed exact k-NN for queries: [" << q_b << "," << q_e
+    //           << ")" << std::endl;
+  }
+
+  delete[] dist_matrix;
+
+  delete[] points_l2sq;
+  delete[] queries_l2sq;
+
+  if (metric == efanna2e::Metric::COSINE) {
+    delete[] points;
+    delete[] queries;
+  }
+}
+
+inline bool custom_dist(const std::pair<uint32_t, float> &a,
+                        const std::pair<uint32_t, float> &b) {
+  return a.second < b.second;
+}
+
+void IndexBipartite::ComputeLearnBaseKNN(float *base_data, float *query_data, size_t k,
+             const efanna2e::Metric &metric, size_t npoints, size_t nqueries, size_t dim) {
+  std::vector<std::vector<std::pair<uint32_t, float>>> results(nqueries);
+
+  int   *closest_points = new int[nqueries * k];
+  float *dist_closest_points = new float[nqueries * k];
+
+  int num_parts = 1;        // hack
+  for (int p = 0; p < num_parts; p++) {
+    size_t start_id = p * PARTSIZE;
+    int   *closest_points_part = new int[nqueries * k];
+    float *dist_closest_points_part = new float[nqueries * k];
+
+    auto nr = std::min(npoints, k);
+
+    exact_knn(dim, nr, closest_points_part, dist_closest_points_part, npoints,
+              base_data, nqueries, query_data, metric);
+
+    for (_u64 i = 0; i < nqueries; i++) {
+      for (_u64 j = 0; j < nr; j++) {
+        results[i].push_back(std::make_pair(
+            (uint32_t) (closest_points_part[i * nr + j] + start_id),
+            dist_closest_points_part[i * nr + j]));
+      }
+    }
+
+    delete[] closest_points_part;
+    delete[] dist_closest_points_part;
+  }
+
+  for (_u64 i = 0; i < nqueries; i++) {
+    std::vector<std::pair<uint32_t, float>> &cur_res = results[i];
+    std::sort(cur_res.begin(), cur_res.end(), custom_dist);
+    size_t j = 0;
+    for (auto iter : cur_res) {
+      if (j == k)
+        break;
+      closest_points[i * k + j] = (int32_t) iter.first;
+
+      if (metric == efanna2e::Metric::INNER_PRODUCT)
+        dist_closest_points[i * k + j] = -iter.second;
+      else
+        dist_closest_points[i * k + j] = iter.second;
+
+      ++j;
+    }
+    if (j < k)
+      std::cout << "WARNING: found less than k GT entries for query " << i
+                << std::endl;
+    }
+
+    // closest_points is k * nqueries
+
+    this->learn_base_knn_ = std::vector<std::vector<uint32_t> >(nqueries, std::vector<uint32_t>(k));
+    for (size_t i = 0; i < nqueries; i++) {
+        for (size_t j = 0; j < k; j++) {
+        this->learn_base_knn_[i][j] = closest_points[i * k + j];
+        }
+    }
+
+  delete[] dist_closest_points;
+}
+
+// ======= Copied and reorganized from DiskANN compute_groundtruth.cpp end ======
 
 void IndexBipartite::LoadBaseLearnKNN(const char *filename) {
     std::ifstream in(filename, std::ios::binary);

@@ -222,6 +222,88 @@ class NeighborPriorityQueue {
     std::vector<Neighbor> _data;
 };
 
+class NeighborDiffPriorityQueue {
+   public:
+    NeighborDiffPriorityQueue() : _size(0), _cur(0), _ip_diff(0) {}
+
+    explicit NeighborDiffPriorityQueue(float ip_diff) : _size(0), _cur(0), _ip_diff(ip_diff), _data(0) {}
+    // : _size(0), _capacity(capacity), _cur(0), _data(capacity + 1), candidates_id(capacity + 1) {}
+
+    bool should_pick(const Neighbor &nbr) {
+        if (_size == 0) {
+            return true;
+        }
+        auto closest_nbr = _data[_cur];
+        return nbr.distance > closest_nbr.distance - _ip_diff;
+    }
+
+    // Inserts the item ordered into the set up to the sets capacity.
+    // The item will be dropped if it is the same id as an exiting
+    // set item or it has a greated distance than the final
+    // item in the set. The set cursor that is used to pop() the
+    // next item will be set to the lowest index of an uncheck item
+    int insert(const Neighbor &nbr) {
+        // if (!should_pick(nbr)) {
+        //     return;
+        // }
+
+        size_t lo = 0, hi = _size;
+        while (lo < hi) {
+            size_t mid = (lo + hi) >> 1;
+            if (nbr < _data[mid]) {
+                hi = mid;
+                // Make sure the same id isn't inserted into the set
+            } else if (UNLIKELY(_data[mid].id == nbr.id)) {
+                return lo;
+            } else {
+                lo = mid + 1;
+            }
+        }
+
+        // insert at lo
+        _data.insert(_data.begin() + lo, {nbr.id, nbr.distance, false});
+        _size++;
+        if (lo < _cur) {
+            _cur = lo;
+        }
+
+        return lo;
+    }
+
+    Neighbor closest_unexpanded() {
+        _data[_cur].flag = true;
+        size_t pre = _cur;
+        while (_cur < _size && _data[_cur].flag) {
+            _cur++;
+        }
+        return _data[pre];
+    }
+
+    bool has_unexpanded_node() const { return _cur < _size; }
+
+    size_t size() const { return _size; }
+
+    Neighbor &operator[](size_t i) { return _data[i]; }
+
+    Neighbor operator[](size_t i) const { return _data[i]; }
+
+    void clear() {
+        _size = 0;
+        _cur = 0;
+    }
+    std::vector<Neighbor> &get_data() { return _data; }
+
+    int head_dist() { return _data[0].distance; }
+    int tail_dist() { return _data[_size - 1].distance; }
+
+    // std::vector<uint32_t> candidates_id;
+
+   private:
+    size_t _size, _cur;
+    float _ip_diff;
+    std::vector<Neighbor> _data;
+};
+
 }  // namespace efanna2e
 
 #endif  // EFANNA2E_GRAPH_H

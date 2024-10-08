@@ -29,4 +29,18 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Ofast -DNDEBUG -march=n
 # add_definitions (-std=c++14 -O3 -lboost -march=native -Wall -DINFO)
 
 add_subdirectory(src)
-add_subdirectory(tests)
+# add_subdirectory(tests)
+
+
+include(FetchContent)
+
+FetchContent_Declare(
+    pybind11
+    URL https://github.com/pybind/pybind11/archive/refs/tags/v2.13.1.zip
+    DOWNLOAD_EXTRACT_TIMESTAMP ON
+)
+FetchContent_MakeAvailable(pybind11)
+
+pybind11_add_module(roargraph MODULE pybinding.cpp)
+target_link_libraries(roargraph PRIVATE efanna2e)
+target_compile_definitions(roargraph PUBLIC)

@@ -99,10 +99,16 @@ class IndexBipartite : public Index {
 
     std::pair<uint32_t, uint32_t> SearchRoarGraph(const float *query, size_t k, size_t &qid, const Parameters &parameters,
                                    unsigned *indices, std::vector<float>& res_dists);
+    
+    std::pair<uint32_t, uint32_t> SearchRoarGraphIPDiff(const float *query, float exp_ratio, size_t &qid, const Parameters &parameters,
+                                std::vector<unsigned>& res_indices, std::vector<float>& res_dists);
 
     void SaveProjectionGraph(const char *filename);
 
     void LoadProjectionGraph(const char *filename);
+
+    void ComputeLearnBaseKNN(float *base_data, float *query_data, size_t k,
+             const efanna2e::Metric &metric, size_t npoints, size_t nqueries, size_t dim);
 
     void LoadNsgGraph(const char *filename);
 

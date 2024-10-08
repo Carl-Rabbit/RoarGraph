@@ -11,16 +11,16 @@ Index::Index(const size_t dimension, const size_t n, Metric metric = L2)
     switch (metric_) {
         case efanna2e::L2:
             distance_ = new DistanceL2();
-            std::cout << "Inside using L2 distance." << std::endl;
+            // std::cout << "Inside using L2 distance." << std::endl;
             break;
         case efanna2e::COSINE:
         case efanna2e::INNER_PRODUCT:
             distance_ = new DistanceInnerProduct();
-            std::cout << "Inside using IP distance after normalization." << std::endl;
+            // std::cout << "Inside using IP distance after normalization." << std::endl;
             break;
         default:
             distance_ = new DistanceL2();
-            std::cout << "Using L2 distance." << std::endl;
+            // std::cout << "Using L2 distance." << std::endl;
             break;
     }
 }
