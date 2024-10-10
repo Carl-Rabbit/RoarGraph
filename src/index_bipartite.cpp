@@ -2441,10 +2441,10 @@ std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraph(const float *query
     return std::make_pair(cmps, hops);
 }
 
-std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraphIPDiff(const float *query, float exp_ratio, size_t &qid, const Parameters &parameters,
+std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraphThreshold(const float *query, float exp_ratio, int update_cnt_threshold, int capacity_factor, size_t &qid, const Parameters &parameters,
                                                std::vector<unsigned>& res_indices, std::vector<float>& res_dists) {
     const float ip_diff = -sqrt(dimension_) * log(exp_ratio);
-    NeighborDiffPriorityQueue search_queue(ip_diff);
+    NeighborDiffPriorityQueue search_queue(ip_diff, capacity_factor);
     // search_queue.reserve(L_pq);
     // std::random_device rd;
     // std::mt19937 gen(rd());
@@ -2483,6 +2483,9 @@ std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraphIPDiff(const float 
         // visited.insert(id);
         // memory_access_metric.record();
     }
+
+    search_queue.prepare_search();
+
     uint32_t cmps = 0;
     uint32_t hops = 0;
     uint32_t cnt_update = 0;
@@ -2528,24 +2531,25 @@ std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraphIPDiff(const float 
                 // memory_access_metric.reset();
 
                 ++cmps;
-                int update_pos = search_queue.insert({nbr, distance, false});
+                bool is_important = search_queue.insert_and_mantain({nbr, distance, false});
                 // if(search_queue.insert({nbr, distance, false})) {
                 //     _mm_prefetch((char *)projection_graph_[nbr].data(), _MM_HINT_T2);
                 // }
                 // memory_access_metric.record();
-                if (update_pos >= search_queue.size() * 0.1) {
-                    cnt_update++;
-                } else {
+                if (is_important) {
                     cnt_update = 0;
+                } else {
+                    cnt_update++;
                 }
                 // std::cout << "cur_dist=" << distance << ", head_dist=" << search_queue.head_dist() 
                 //     << ", threshold=" << ip_diff << ", update_pos=" << update_pos
                 //     << ", cnt_update=" << cnt_update << ", pool.size_=" << search_queue.size()
                 //     << std::endl;
-                if (search_queue.tail_dist() - search_queue.head_dist() >= ip_diff && cnt_update > 20) {
-                    break;
-                }
             }
+        }
+
+        if (cnt_update > update_cnt_threshold) {
+            break;
         }
     }
     visited_list_pool_->releaseVisitedList(vl);

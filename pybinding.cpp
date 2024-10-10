@@ -124,7 +124,7 @@ public:
         return result;
     }
 
-    py::array_t<uint32_t> searchIPDiff(py::array_t<float>& query, float exp_ratio) {
+    py::array_t<uint32_t> search_by_threshold(py::array_t<float>& query, float exp_ratio, int update_cnt_threshold, int capacity_factor) {
         py::buffer_info q_buf = query.request();
         float* q_ptr = static_cast<float*>(q_buf.ptr);
         if (q_buf.ndim != 1) {
@@ -141,7 +141,7 @@ public:
         std::vector<unsigned> res;
         std::vector<float> dists;        // useless
         size_t unused = 0;      // useless index
-        index_bipartite->SearchRoarGraphIPDiff(q_ptr, exp_ratio, unused, *(this->parameters), res, dists);
+        index_bipartite->SearchRoarGraphThreshold(q_ptr, exp_ratio, update_cnt_threshold, capacity_factor, unused, *(this->parameters), res, dists);
 
         // std::cout << "Search done" << std::endl;
 
@@ -156,11 +156,11 @@ public:
         return result;
     }
 
-    double getKnnTime() {
+    double get_knn_time() {
         return this->knn_time;
     }
 
-    double getGraphTime() {
+    double get_graph_time() {
         return this->graph_time;
     }
 };
@@ -175,10 +175,10 @@ PYBIND11_MODULE( roargraph, m ){
             py::arg("vectors"), py::arg("sample_queries"))
         .def("search", &RoarGraph::search, 
             py::arg("query"), py::arg("k"))
-        .def("searchIPDiff", &RoarGraph::searchIPDiff, 
-            py::arg("query"), py::arg("exp_ratio"))
-        .def("getKnnTime", &RoarGraph::getKnnTime, 
+        .def("search_by_threshold", &RoarGraph::search_by_threshold, 
+            py::arg("query"), py::arg("exp_ratio"), py::arg("update_cnt_threshold"), py::arg("capacity_factor"))
+        .def("get_knn_time", &RoarGraph::get_knn_time, 
             "Get the time for building base KNN")
-        .def("getGraphTime", &RoarGraph::getGraphTime, 
+        .def("get_graph_time", &RoarGraph::get_graph_time, 
             "Get the time for building RoarGraph");
 }

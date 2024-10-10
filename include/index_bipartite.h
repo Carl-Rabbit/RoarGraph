@@ -100,7 +100,7 @@ class IndexBipartite : public Index {
     std::pair<uint32_t, uint32_t> SearchRoarGraph(const float *query, size_t k, size_t &qid, const Parameters &parameters,
                                    unsigned *indices, std::vector<float>& res_dists);
     
-    std::pair<uint32_t, uint32_t> SearchRoarGraphIPDiff(const float *query, float exp_ratio, size_t &qid, const Parameters &parameters,
+    std::pair<uint32_t, uint32_t> SearchRoarGraphThreshold(const float *query, float exp_ratio, int update_cnt_threshold, int capacity_factor, size_t &qid, const Parameters &parameters,
                                 std::vector<unsigned>& res_indices, std::vector<float>& res_dists);
 
     void SaveProjectionGraph(const char *filename);
