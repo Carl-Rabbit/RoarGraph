@@ -40,7 +40,11 @@ IndexBipartite::IndexBipartite(const size_t dimension, const size_t n, Metric m,
     }
 }
 
-IndexBipartite::~IndexBipartite() {}
+IndexBipartite::~IndexBipartite() {
+    if (visited_list_pool_) {
+        delete visited_list_pool_;
+    }
+}
 
 void IndexBipartite::BuildBipartite(size_t n_sq, const float *sq_data, size_t n_bp, const float *bp_data,
                                     const Parameters &parameters) {
@@ -1876,13 +1880,21 @@ void IndexBipartite::PruneProjectionBaseSearchCandidates(std::vector<Neighbor> &
 
     result.reserve(M_pjbp * PROJECTION_SLACK);
     uint32_t start = 0;
-
-    if (search_pool[start].id == qid) {
+    // bug in CHEN Meng's code
+    // start should be in the range when we increase it
+    // so check it
+    if (start < search_pool.size() && search_pool[start].id == qid) {
         start++;
     }
     auto &src_nbrs = projection_graph_[qid];
-    while (std::find(src_nbrs.begin(), src_nbrs.end(), search_pool[start].id) != src_nbrs.end()) {
+    // bug fix: check start range
+    while (start < search_pool.size() && std::find(src_nbrs.begin(), src_nbrs.end(), search_pool[start].id) != src_nbrs.end()) {
         ++start;
+    }
+    // bug fix: check start range
+    if (start >= search_pool.size()) {
+        // throw std::runtime_error("visit search_pool out of range");
+        return;     // if out of range, then do not prune 
     }
     result.push_back(search_pool[start].id);
     // ++start;
@@ -2393,8 +2405,10 @@ std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraph(const float *query
             // if (visited.find(nbr) != visited.end()) {
             // _mm_prefetch((char *)(visited_array + *(cur_nbrs + j)), _MM_HINT_T0);
             // if (j + 1 <= projection_graph_[cur_id].size()) {
-            _mm_prefetch((char *)(visited_array + *(cur_nbrs + j + 1)), _MM_HINT_T0);
-            _mm_prefetch((char *)(data_bp_ + *(cur_nbrs + j + 1) * dimension_), _MM_HINT_T0);
+            if (j + 1 < projection_graph_[cur_id].size()) {
+                _mm_prefetch((char *)(visited_array + *(cur_nbrs + j + 1)), _MM_HINT_T0);
+                _mm_prefetch((char *)(data_bp_ + *(cur_nbrs + j + 1) * dimension_), _MM_HINT_T0);
+            }
             // }
             // _mm_prefetch((char *)(data_bp_ + *(cur_nbrs + j) * dimension_), _MM_HINT_T0);
             if (visited_array[nbr] != visited_array_tag) {
@@ -2507,8 +2521,10 @@ std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraphThreshold(const flo
             // if (visited.find(nbr) != visited.end()) {
             // _mm_prefetch((char *)(visited_array + *(cur_nbrs + j)), _MM_HINT_T0);
             // if (j + 1 <= projection_graph_[cur_id].size()) {
-            _mm_prefetch((char *)(visited_array + *(cur_nbrs + j + 1)), _MM_HINT_T0);
-            _mm_prefetch((char *)(data_bp_ + *(cur_nbrs + j + 1) * dimension_), _MM_HINT_T0);
+            if (j + 1 < projection_graph_[cur_id].size()) {
+                _mm_prefetch((char *)(visited_array + *(cur_nbrs + j + 1)), _MM_HINT_T0);
+                _mm_prefetch((char *)(data_bp_ + *(cur_nbrs + j + 1) * dimension_), _MM_HINT_T0);
+            }
             // }
             // _mm_prefetch((char *)(data_bp_ + *(cur_nbrs + j) * dimension_), _MM_HINT_T0);
             if (visited_array[nbr] != visited_array_tag) {

@@ -24,5 +24,9 @@ Index::Index(const size_t dimension, const size_t n, Metric metric = L2)
             break;
     }
 }
-Index::~Index() {}
+Index::~Index() {
+    if (distance_) {
+        delete distance_;
+    }
+}
 }  // namespace efanna2e
