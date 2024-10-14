@@ -8,8 +8,8 @@ find_package(MKL REQUIRED HINTS ${MKL_ROOT})
 add_library(${PROJECT_NAME} STATIC ${CPP_SOURCES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${MKL_INCLUDE})
-target_link_libraries(${PROJECT_NAME} PUBLIC ${MKL_LIBRARIES})  # dynamic link
-# target_link_libraries(${PROJECT_NAME} PUBLIC MKL::MKL)      # static link
+# target_link_libraries(${PROJECT_NAME} PUBLIC ${MKL_LIBRARIES})  # dynamic link
+target_link_libraries(${PROJECT_NAME} PUBLIC MKL::MKL)      # static link
 set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # debug
