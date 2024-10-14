@@ -40,11 +40,14 @@ IndexBipartite::IndexBipartite(const size_t dimension, const size_t n, Metric m,
     }
 }
 
-IndexBipartite::~IndexBipartite() {
-    if (visited_list_pool_) {
-        delete visited_list_pool_;
-    }
-}
+// IndexBipartite::~IndexBipartite() {
+//     if (visited_list_pool_) {
+//         delete visited_list_pool_;
+//     }
+//     if (l2_distance_) {
+//         delete l2_distance_;
+//     }
+// }
 
 void IndexBipartite::BuildBipartite(size_t n_sq, const float *sq_data, size_t n_bp, const float *bp_data,
                                     const Parameters &parameters) {
@@ -3080,7 +3083,8 @@ void IndexBipartite::ComputeLearnBaseKNN(float *base_data, float *query_data, si
         }
     }
 
-  delete[] dist_closest_points;
+    delete[] closest_points;
+    delete[] dist_closest_points;
 }
 
 // ======= Copied and reorganized from DiskANN compute_groundtruth.cpp end ======

@@ -25,8 +25,8 @@ public:
     uint32_t M_pjbp, L_pjpq;
     uint32_t K;
     uint32_t num_threads;
-    efanna2e::IndexBipartite* index_bipartite = nullptr;
-    efanna2e::Parameters parameters;
+    efanna2e::IndexBipartite *index_bipartite = nullptr;
+    efanna2e::Parameters *parameters;
     uint32_t n_vectors;
     uint32_t n_queries;
     uint32_t dim;
@@ -42,7 +42,9 @@ public:
 
     ~RoarGraph() {
         delete index_bipartite;
-        // delete parameters;
+        delete parameters;
+        delete[] v_ptr;
+        delete[] sq_ptr;
     }
 
     void build(std::vector<float>& vectors, std::vector<float>& sample_queries, int dim) {
@@ -62,12 +64,12 @@ public:
         // efanna2e::IndexBipartite index_bipartite(base_dim, base_num + sq_num, dist_metric, nullptr);
         this->index_bipartite = new efanna2e::IndexBipartite(this->dim, this->n_vectors + this->n_queries, efanna2e::INNER_PRODUCT, nullptr);
 
-        std::cout << "num_threads: " << this->num_threads << std::endl;
-        parameters.Set<uint32_t>("M_sq", this->M_sq);
-        parameters.Set<uint32_t>("L_pq", this->L_pq);
-        parameters.Set<uint32_t>("M_pjbp", this->M_pjbp);
-        parameters.Set<uint32_t>("L_pjpq", this->L_pjpq);
-        parameters.Set<uint32_t>("num_threads", this->num_threads);
+        this->parameters = new efanna2e::Parameters();
+        parameters->Set<uint32_t>("M_sq", this->M_sq);
+        parameters->Set<uint32_t>("L_pq", this->L_pq);
+        parameters->Set<uint32_t>("M_pjbp", this->M_pjbp);
+        parameters->Set<uint32_t>("L_pjpq", this->L_pjpq);
+        parameters->Set<uint32_t>("num_threads", this->num_threads);
         // std::cout << "M_bp: " << M_bp << std::endl;
         // index_bipartite.LoadLearnBaseKNN(learn_base_nn_file.c_str());
 
@@ -81,7 +83,7 @@ public:
 
         omp_set_num_threads(this->num_threads);
         s = std::chrono::high_resolution_clock::now();
-        index_bipartite->BuildRoarGraph(this->n_queries, this->sq_ptr, this->n_vectors, this->v_ptr, parameters);
+        index_bipartite->BuildRoarGraph(this->n_queries, this->sq_ptr, this->n_vectors, this->v_ptr, *this->parameters);
         e = std::chrono::high_resolution_clock::now();
         diff = e - s;
         this->graph_time = diff.count();
@@ -101,7 +103,7 @@ public:
         unsigned res[k];
         std::vector<float> dists(k);        // useless
         size_t unused = 0;      // useless index
-        index_bipartite->SearchRoarGraph(query, k, unused, parameters, res, dists);
+        index_bipartite->SearchRoarGraph(query, k, unused, *parameters, res, dists);
 
         // std::cout << "Search done" << std::endl;
 
@@ -131,8 +133,7 @@ public:
         std::vector<unsigned> res;
         std::vector<float> dists;        // useless
         size_t unused = 0;      // useless index
-        index_bipartite->SearchRoarGraphThreshold(query.data(), exp_ratio, update_cnt_threshold, capacity_factor, unused, parameters, res, dists);
-
+        index_bipartite->SearchRoarGraphThreshold(query.data(), exp_ratio, update_cnt_threshold, capacity_factor, unused, *parameters, res, dists);
         // std::cout << "Search done" << std::endl;
 
         std::vector<uint32_t> result={};
@@ -226,8 +227,8 @@ void Load(std::string path,
 
 inline bool to_test(int layer, int head) {
     // return layer >= 8 && layer < 9 && head < 1;
-    // return layer == 4 and head == 1;
-    return true;
+    return layer == 4 and head == 1;
+    // return true;
 }
 
 int main(){

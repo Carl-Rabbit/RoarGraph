@@ -25,7 +25,14 @@ class IndexBipartite : public Index {
 
    public:
     explicit IndexBipartite(const size_t dimension, const size_t n, Metric m, Index *initializer);
-    virtual ~IndexBipartite();
+    ~IndexBipartite() {
+        if (visited_list_pool_) {
+            delete visited_list_pool_;
+        }
+        if (l2_distance_) {
+            delete l2_distance_;
+        }
+    }
     virtual void Save(const char *filename) override;
     virtual void Load(const char *filename) override;
     virtual void Search(const float *query, const float *x, size_t k, const Parameters &parameters,

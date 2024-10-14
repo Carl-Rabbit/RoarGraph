@@ -45,10 +45,18 @@ public:
         M_sq(M_sq), L_pq(L_pq), M_pjbp(M_pjbp), L_pjpq(L_pjpq), K(K), num_threads(num_threads) {};
 
     ~RoarGraph() {
-        delete index_bipartite;
-        delete parameters;
-        delete[] v_ptr;
-        delete[] sq_ptr;
+        if (index_bipartite) {
+            delete index_bipartite;
+        }
+        if (parameters) {
+            delete parameters;
+        }
+        if (v_ptr) {
+            delete[] v_ptr;
+        }
+        if (sq_ptr) {
+            delete[] sq_ptr;
+        }
     }
     
     void build(py::array_t<float>& vectors, py::array_t<float>& sample_queries) {
