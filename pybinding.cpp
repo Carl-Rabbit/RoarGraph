@@ -101,6 +101,8 @@ public:
         diff = e - s;
         this->graph_time = diff.count();
         // std::cout << "RoarGraph indexing time: " << this->graph_time << "\n";
+
+        index_bipartite->InitVisitedListPool(this->num_threads);
     }
 
     py::array_t<uint32_t> search(py::array_t<float>& query, int k) {
@@ -110,9 +112,7 @@ public:
             throw std::runtime_error("numpy.ndarray dims must be 1!");
         }
 
-        // std::cout << "Searching for " << k << " nearest neighbors" << std::endl;
-
-        index_bipartite->InitVisitedListPool(this->num_threads);
+        // std::cout << "Searching for " << k << " nearest neighbors" << std::endl
 
         unsigned res[k];
         std::vector<float> dists(k);        // useless
@@ -144,12 +144,40 @@ public:
 
         // std::cout << "Searching vectors that larger that exp_max * " << exp_ratio << std::endl;
 
-        index_bipartite->InitVisitedListPool(this->num_threads);
-
         std::vector<unsigned> res;
         std::vector<float> dists;        // useless
         size_t unused = 0;      // useless index
         index_bipartite->SearchRoarGraphThreshold(q_ptr, exp_ratio, update_cnt_threshold, capacity_factor, unused, *(this->parameters), res, dists);
+
+        // std::cout << "Search done" << std::endl;
+
+        py::array_t<uint32_t> result = py::array_t<uint32_t>(res.size());
+        py::buffer_info result_buf = result.request();
+        uint32_t* result_ptr = static_cast<uint32_t*>(result_buf.ptr);
+
+        for (int i = 0; i < res.size(); i++) {
+            result_ptr[i] = res[i];
+        }
+
+        return result;
+    }
+
+    py::array_t<uint32_t> search_by_maxsum(py::array_t<float>& query, float maxsum_ratio, int update_cnt_threshold, int capacity_factor) {
+        py::buffer_info q_buf = query.request();
+        float* q_ptr = static_cast<float*>(q_buf.ptr);
+        if (q_buf.ndim != 1) {
+            throw std::runtime_error("numpy.ndarray dims must be 1!");
+        }
+        if (maxsum_ratio <= 0 || maxsum_ratio > 1) {
+            throw std::runtime_error("maxsum_ratio must be in (0, 1]");
+        }
+
+        // std::cout << "Searching vectors that larger that sum(exp) >= " << maxsum_ratio << std::endl;
+
+        std::vector<unsigned> res;
+        std::vector<float> dists;        // useless
+        size_t unused = 0;      // useless index
+        index_bipartite->SearchRoarGraphMaxsum(q_ptr, maxsum_ratio, update_cnt_threshold, capacity_factor, unused, *(this->parameters), res, dists);
 
         // std::cout << "Search done" << std::endl;
 
@@ -185,6 +213,8 @@ PYBIND11_MODULE( roargraph, m ){
             py::arg("query"), py::arg("k"))
         .def("search_by_threshold", &RoarGraph::search_by_threshold, 
             py::arg("query"), py::arg("exp_ratio"), py::arg("update_cnt_threshold"), py::arg("capacity_factor"))
+        .def("search_by_maxsum", &RoarGraph::search_by_maxsum, 
+            py::arg("query"), py::arg("maxsum_ratio"), py::arg("update_cnt_threshold"), py::arg("capacity_factor"))
         .def("get_knn_time", &RoarGraph::get_knn_time, 
             "Get the time for building base KNN")
         .def("get_graph_time", &RoarGraph::get_graph_time, 

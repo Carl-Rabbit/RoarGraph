@@ -2584,6 +2584,170 @@ std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraphThreshold(const flo
     return std::make_pair(cmps, hops);
 }
 
+// cannot run correctly
+std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraphMaxsum(const float *query, float maxsum_ratio, int update_cnt_threshold, int capacity_factor, size_t &qid, const Parameters &parameters,
+                                               std::vector<unsigned>& res_indices, std::vector<float>& res_dists) {
+    NeighborMaxsumPriorityQueue search_queue(maxsum_ratio, capacity_factor);
+    // search_queue.reserve(L_pq);
+    // std::random_device rd;
+    // std::mt19937 gen(rd());
+    // std::uniform_int_distribution<uint32_t> dis(0, u32_nd_ - 1);
+    // uint32_t start = dis(gen);  // start is base
+    // uint32_t start = projection_ep_;
+    // projection_ep_ = start;
+    std::vector<uint32_t> init_ids;
+    init_ids.push_back(projection_ep_);
+    prefetch_vector((char *)(data_bp_ + projection_ep_ * dimension_), dimension_);
+    // init_ids.push_back(projection_ep_);
+    // _mm_prefetch((char *)data_bp_ + projection_ep_ * dimension_, _MM_HINT_T0);
+    // init_ids.push_back(dis(gen));
+    // block_metric.reset();
+    // boost::dynamic_bitset<> visited{u32_nd_, 0};
+    // tsl::robin_set<uint32_t> visited(5000);
+    // std::bitset<bsize> visited;
+    // block_metric.record();
+    VisitedList *vl = visited_list_pool_->getFreeVisitedList();
+    vl_type *visited_array = vl->mass;
+    vl_type visited_array_tag = vl->curV;
+
+    search_queue.reserve(init_ids.size());
+
+    for (auto &id : init_ids) {
+        // dist_cmp_metric.reset();
+        float distance = distance_->compare(data_bp_ + id * dimension_, query, (unsigned)dimension_);
+        // if (metric_ == efanna2e::Metric::INNER_PRODUCT) {
+        //     distance = -distance;
+        // }
+        // dist_cmp_metric.record();
+
+        // memory_access_metric.reset();
+        Neighbor nn = Neighbor(id, distance, false);
+        search_queue.insert(nn);
+        // visited_array[id] = visited_array_tag;
+        // visited.set(id);
+        // visited.insert(id);
+        // memory_access_metric.record();
+    }
+
+    int n_vectors = this->nd_;
+    double min_softmax = 1.0;     // after scale is 1.0 as exp(x - x_max) = 1.0 and x now is x_max
+    double est_sel_sum = min_softmax;
+    double est_total_sum = min_softmax * n_vectors;
+    int est_visited_cnt = 1;
+    uint32_t cnt_update = 0;
+
+    // init search queue
+
+
+
+    uint32_t cmps = 0;
+    uint32_t hops = 0;
+
+    while (search_queue.has_unexpanded_node()) {
+        // memory_access_metric.reset();
+        auto cur_check_node = search_queue.closest_unexpanded();
+        auto cur_id = cur_check_node.id;
+        // visited.set(cur_id);
+        uint32_t *cur_nbrs = projection_graph_[cur_id].data();
+        // memory_access_metric.record();
+        // _mm_prefetch((char *)(visited_array + *(cur_nbrs + 1)), _MM_HINT_T0);
+        // _mm_prefetch((char *)(data_bp_ + *(cur_nbrs) * dimension_), _MM_HINT_T0);
+
+        ++hops;
+        // get neighbors' neighbors, first
+        for (size_t j = 0; j < projection_graph_[cur_id].size(); ++j) {  // current check node's neighbors
+            uint32_t nbr = *(cur_nbrs + j);
+            // memory_access_metric.reset();
+            // if (visited.find(nbr) != visited.end()) {
+            // _mm_prefetch((char *)(visited_array + *(cur_nbrs + j)), _MM_HINT_T0);
+            // if (j + 1 <= projection_graph_[cur_id].size()) {
+            if (j + 1 < projection_graph_[cur_id].size()) {
+                _mm_prefetch((char *)(visited_array + *(cur_nbrs + j + 1)), _MM_HINT_T0);
+                _mm_prefetch((char *)(data_bp_ + *(cur_nbrs + j + 1) * dimension_), _MM_HINT_T0);
+            }
+            // }
+            // _mm_prefetch((char *)(data_bp_ + *(cur_nbrs + j) * dimension_), _MM_HINT_T0);
+            if (visited_array[nbr] != visited_array_tag) {
+                // if (visited.test(nbr)) {
+                //     continue;
+                // }
+                // prefetch_vector((char *)(data_bp_ + nbr * dimension_), dimension_);
+                // visited.insert(nbr);
+                // visited.set(nbr);
+                visited_array[nbr] = visited_array_tag;
+                // memory_access_metric.record();
+                float distance = -distance_->compare(data_bp_ + nbr * dimension_, query, (unsigned)dimension_);     // dist is -IP, so use -dist
+                // _mm_prefetch((char *) data_bp_ + )
+                // dist_cmp_metric.reset();
+                // if (likely(metric_ == efanna2e::INNER_PRODUCT)) {
+                //     distance = -distance;
+                // }
+
+                // dist_cmp_metric.record();
+                // memory_access_metric.reset();
+
+                ++cmps;
+
+                // compute softmax and apply scale
+                float x_max = -search_queue.head_dist();       // dist is -IP, so use -dist
+                double softmax;
+                if (distance > x_max) {
+                    softmax = 1.0;      // exp(x_max - x_max) = 1.0
+                    double exp_scale = exp(x_max - distance);   // scale down
+                    est_sel_sum *= exp_scale;
+                    est_total_sum *= exp_scale;
+                    min_softmax *= exp_scale;
+                } else {
+                    softmax = exp(distance - x_max);
+                }
+
+                // update est total maxsum
+                if (softmax < min_softmax) {
+                    est_total_sum += (n_vectors - est_visited_cnt + 1) * (softmax - min_softmax);
+                    min_softmax = softmax;
+                } else {
+                    est_total_sum += softmax - min_softmax;
+                }
+
+                search_queue.insert({nbr, -distance, false});    // dist is -IP, so use -dist
+
+                // if(search_queue.insert({nbr, distance, false})) {
+                //     _mm_prefetch((char *)projection_graph_[nbr].data(), _MM_HINT_T2);
+                // }
+                // memory_access_metric.record();
+                if (true) {
+                    est_sel_sum += softmax;
+                    cnt_update = 0;
+                } else {
+                    ++cnt_update;
+                }
+
+                ++est_visited_cnt;
+
+                // std::cout << "cur_dist=" << distance << ", head_dist=" << search_queue.head_dist() 
+                //     << ", threshold=" << ip_diff << ", update_pos=" << update_pos
+                //     << ", cnt_update=" << cnt_update << ", pool.size_=" << search_queue.size()
+                //     << std::endl;
+            }
+        }
+
+        if (cnt_update > update_cnt_threshold) {
+            break;
+        }
+    }
+    visited_list_pool_->releaseVisitedList(vl);
+
+    unsigned k = search_queue.size();
+    res_indices.resize(k);
+    res_dists.resize(k);
+    for (size_t i = 0; i < k; ++i) {
+        // indices[qid * k + i] = search_queue[i].id;
+        res_indices[i] = search_queue[i].id;
+        res_dists[i] = search_queue[i].distance;
+    }
+    return std::make_pair(cmps, hops);
+}
+
 
 // uint32_t IndexBipartite::SearchProjectionGraph(const float *query, size_t k, size_t &qid, const Parameters
 // &parameters,

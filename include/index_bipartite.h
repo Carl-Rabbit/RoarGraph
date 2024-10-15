@@ -109,6 +109,9 @@ class IndexBipartite : public Index {
     
     std::pair<uint32_t, uint32_t> SearchRoarGraphThreshold(const float *query, float exp_ratio, int update_cnt_threshold, int capacity_factor, size_t &qid, const Parameters &parameters,
                                 std::vector<unsigned>& res_indices, std::vector<float>& res_dists);
+    
+    std::pair<uint32_t, uint32_t> SearchRoarGraphMaxsum(const float *query, float maxsum_ratio, int update_cnt_threshold, int capacity_factor, size_t &qid, const Parameters &parameters,
+                            std::vector<unsigned>& res_indices, std::vector<float>& res_dists);
 
     void SaveProjectionGraph(const char *filename);
 
@@ -143,7 +146,12 @@ class IndexBipartite : public Index {
 
     void findroot(boost::dynamic_bitset<> &flag, unsigned &root, const Parameters &parameter);
 
-    void InitVisitedListPool(uint32_t num_threads) { visited_list_pool_ = new VisitedListPool(num_threads, nd_); };
+    void InitVisitedListPool(uint32_t num_threads) {
+        if (visited_list_pool_) {
+            delete visited_list_pool_;
+        }
+        visited_list_pool_ = new VisitedListPool(num_threads, nd_); 
+    };
 
     void qbaseNNbipartite(const Parameters &parameters);
 
