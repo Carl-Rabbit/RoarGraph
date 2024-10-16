@@ -88,6 +88,8 @@ public:
         diff = e - s;
         this->graph_time = diff.count();
         // std::cout << "RoarGraph indexing time: " << this->graph_time << "\n";
+
+        index_bipartite->InitVisitedListPool(this->num_threads);
     }
 
     std::vector<uint32_t> search(const float *query, int k) {
@@ -98,12 +100,11 @@ public:
         // }
 
         // std::cout << "Searching for " << k << " nearest neighbors" << std::endl;
-        index_bipartite->InitVisitedListPool(this->num_threads);
-
-        unsigned res[k];
+        std::vector<unsigned> res(k);
         std::vector<float> dists(k);        // useless
         size_t unused = 0;      // useless index
-        index_bipartite->SearchRoarGraph(query, k, unused, *parameters, res, dists);
+        // index_bipartite->SearchRoarGraph(query, k, unused, *parameters, res, dists);
+        index_bipartite->SearchRoarGraphMaxsum(query, 0.9, 100, 4, unused, *parameters, res, dists);
 
         // std::cout << "Search done" << std::endl;
 
@@ -127,9 +128,6 @@ public:
         // }
 
         // std::cout << "Searching vectors that larger that exp_max * " << exp_ratio << std::endl;
-
-        index_bipartite->InitVisitedListPool(this->num_threads);
-
         std::vector<unsigned> res;
         std::vector<float> dists;        // useless
         size_t unused = 0;      // useless index
@@ -235,7 +233,7 @@ int main(){
     std::cout << "START!!!" << std::endl;
 
     int topK = 64, sample_size = 100;
-    std::string path = "../../../../../offloaded_data/longbench_qasper_q0";
+    std::string path = "/home/zhengxin/llm-vdb/Quest-vdb/offloaded_data/longbench_qasper_q0";
 
     VectorMatrix queries, keys, sample_queries;
     int dim, n_layer, n_head, n_token, decode_pos;
@@ -271,6 +269,7 @@ int main(){
             for (int k = sample_size; k < n_token; k++) {
                 auto query = queries[i][j].data() + k * dim;
                 auto s = std::chrono::high_resolution_clock::now();
+                std::cout << std::endl;
                 std::vector<uint32_t> res = graphs[i * n_head + j]->search(query, topK);
                 auto e = std::chrono::high_resolution_clock::now();
                 std::chrono::duration<double> diff = e - s;

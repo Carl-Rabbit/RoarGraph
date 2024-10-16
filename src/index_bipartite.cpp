@@ -2587,7 +2587,7 @@ std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraphThreshold(const flo
 // cannot run correctly
 std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraphMaxsum(const float *query, float maxsum_ratio, int update_cnt_threshold, int capacity_factor, size_t &qid, const Parameters &parameters,
                                                std::vector<unsigned>& res_indices, std::vector<float>& res_dists) {
-    NeighborMaxsumPriorityQueue search_queue(maxsum_ratio, capacity_factor);
+    NeighborMaxsumPriorityQueue search_queue(10);
     // search_queue.reserve(L_pq);
     // std::random_device rd;
     // std::mt19937 gen(rd());
@@ -2610,7 +2610,7 @@ std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraphMaxsum(const float 
     vl_type *visited_array = vl->mass;
     vl_type visited_array_tag = vl->curV;
 
-    search_queue.reserve(init_ids.size());
+    search_queue.reserve_if_not_enough(init_ids.size());
 
     for (auto &id : init_ids) {
         // dist_cmp_metric.reset();
@@ -2629,16 +2629,30 @@ std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraphMaxsum(const float 
         // memory_access_metric.record();
     }
 
+    // init search variables
     int n_vectors = this->nd_;
-    double min_softmax = 1.0;     // after scale is 1.0 as exp(x - x_max) = 1.0 and x now is x_max
-    double est_sel_sum = min_softmax;
-    double est_total_sum = min_softmax * n_vectors;
-    int est_visited_cnt = 1;
+    double dim_scale = 1.0 / sqrt(dimension_);
+    double min_softmax = exp(((-search_queue.tail_dist())-(-search_queue.head_dist())) * dim_scale);
+    double est_total_sum = 0;
+    for (size_t i = 0; i < search_queue.size(); ++i) {
+        est_total_sum += exp(((-search_queue.dist(i))-(-search_queue.head_dist())) * dim_scale);
+    }
+    est_total_sum += (n_vectors - search_queue.size()) * min_softmax;
+    double est_sel_sum = 0;
+    size_t drop_start = 0;
+    double target_sel_sum = maxsum_ratio * est_total_sum;
+    for (; drop_start < search_queue.size(); ++drop_start) {
+        est_sel_sum += exp(((-search_queue.dist(drop_start))-(-search_queue.head_dist())) * dim_scale);
+        if (target_sel_sum <= est_sel_sum) {
+            ++drop_start;
+            break;
+        }
+    }
+    int est_visited_cnt = search_queue.size();
     uint32_t cnt_update = 0;
 
-    // init search queue
-
-
+    // leave space for to-explore points
+    search_queue.reserve_if_not_enough(capacity_factor * drop_start);
 
     uint32_t cmps = 0;
     uint32_t hops = 0;
@@ -2691,43 +2705,101 @@ std::pair<uint32_t, uint32_t> IndexBipartite::SearchRoarGraphMaxsum(const float 
                 // compute softmax and apply scale
                 float x_max = -search_queue.head_dist();       // dist is -IP, so use -dist
                 double softmax;
-                if (distance > x_max) {
-                    softmax = 1.0;      // exp(x_max - x_max) = 1.0
-                    double exp_scale = exp(x_max - distance);   // scale down
+                bool update_max = distance > x_max;
+                if (update_max) {
+                    // update the maximum
+                    softmax = 1.0;      // exp(distance - x_max) = 1.0, now distance = x_max
+                    double exp_scale = exp((x_max - distance) * dim_scale);   // scale down
                     est_sel_sum *= exp_scale;
                     est_total_sum *= exp_scale;
                     min_softmax *= exp_scale;
+                    x_max = distance;       // now it is new max
                 } else {
-                    softmax = exp(distance - x_max);
+                    softmax = exp((distance - x_max) * dim_scale);
                 }
 
                 // update est total maxsum
                 if (softmax < min_softmax) {
-                    est_total_sum += (n_vectors - est_visited_cnt + 1) * (softmax - min_softmax);
+                    est_total_sum += (n_vectors - est_visited_cnt) * (softmax - min_softmax);
                     min_softmax = softmax;
                 } else {
                     est_total_sum += softmax - min_softmax;
                 }
 
-                search_queue.insert({nbr, -distance, false});    // dist is -IP, so use -dist
+                // decide should select or not, and update est sel sum
+                // this ensure drop_start, search_queue and est_sel_sum is consistent
+                bool to_select = false;
+                if (update_max) {
+                    search_queue.insert_at({nbr, -distance, false}, 0);   // dist is -IP, so use -dist
+                    to_select = true;
+                } else {
+                    size_t pos = search_queue.find_bsearch_dist(-distance);    // dist is -IP, so use -dist
+                    if (pos < drop_start) {
+                        to_select = true;
+                    } else if (pos == drop_start && drop_start < search_queue.size()) {
+                        // at border point and might be added
+                        // then check if sel points are not enough
+                        if (maxsum_ratio * est_total_sum > est_sel_sum) {
+                            to_select = true;
+                        }
+                    }
+                    search_queue.insert_at({nbr, -distance, false}, pos);   // dist is -IP, so use -dist
+                }
 
+                if (to_select) {
+                    drop_start += 1;
+                    est_sel_sum += softmax;
+                    cnt_update = 0;
+                } else {
+                    cnt_update += 1;
+                }
+
+                // adjust drop_start
+                target_sel_sum = maxsum_ratio * est_total_sum;
+                if (target_sel_sum > est_sel_sum) {
+                    // can we select more?
+                    for (; drop_start < search_queue.size(); ++drop_start) {
+                        est_sel_sum += exp(((-search_queue.dist(drop_start)) - x_max) * dim_scale);
+                        if (target_sel_sum < est_sel_sum) {
+                            break;
+                        }
+                    }
+                } else {
+                    // can we select less?
+                    for (size_t i = drop_start - 1; i > 0; --i) {
+                        double tmp_softmax = exp(((-search_queue.dist(i)) - x_max) * dim_scale);
+                        if (target_sel_sum > est_sel_sum - tmp_softmax) {
+                            break;
+                        }
+                        --drop_start;
+                        est_sel_sum -= tmp_softmax;
+                    }
+                }
+                search_queue.reserve_if_not_enough(capacity_factor * drop_start);
+                
                 // if(search_queue.insert({nbr, distance, false})) {
                 //     _mm_prefetch((char *)projection_graph_[nbr].data(), _MM_HINT_T2);
                 // }
                 // memory_access_metric.record();
-                if (true) {
-                    est_sel_sum += softmax;
-                    cnt_update = 0;
-                } else {
-                    ++cnt_update;
-                }
 
                 ++est_visited_cnt;
 
-                // std::cout << "cur_dist=" << distance << ", head_dist=" << search_queue.head_dist() 
-                //     << ", threshold=" << ip_diff << ", update_pos=" << update_pos
-                //     << ", cnt_update=" << cnt_update << ", pool.size_=" << search_queue.size()
-                //     << std::endl;
+                // notice that distance is IP value and does not *-1
+                // std::cout << "cur_dist=" << distance << ", "
+                //           << "head_dist=" << -search_queue.head_dist() << ", "
+                //           << "maxsum_ratio=" << maxsum_ratio << ", " 
+                //           << "cur_softmax=" << softmax << ", "
+                //           << "min_softmax=" << min_softmax << ", "
+                //           << "est_visited_cnt=" << est_visited_cnt << ", "
+                //           << "est=" << est_sel_sum << "/" << est_total_sum << "=" << est_sel_sum / est_total_sum << ", " 
+                //           << "target_sel_sum=" << target_sel_sum << ", "
+                //           << "cnt_update=" << cnt_update << ", " 
+                //           << "drop_start=" << drop_start << ", "
+                //           << "pool.size_=" << search_queue.size() << std::endl;
+                // for (size_t i = 0; i < search_queue.size(); ++i) {
+                //     std::cout << exp(((-search_queue.dist(i)) - x_max) * dim_scale) << ", ";
+                // }
+                // std::cout << std::endl;
             }
         }
 
